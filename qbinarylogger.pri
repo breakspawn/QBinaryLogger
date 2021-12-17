@@ -1,10 +1,10 @@
 HEADERS += \
-    $$PWD/src/qoption.h
+    $$PWD/src/qbinarylogger.h
 
 INCLUDEPATH += $$PWD/
 
 DISTFILES += \
-        $$PWD/QOption
+        $$PWD/QBinaryLogger
 
-CONFIG += QOPTION_INCLUDED
-DEFINES += QOPTION_INCLUDED
+CONFIG += QBINARYLOGGER_INCLUDED
+DEFINES += QBINARYLOGGER_INCLUDED
