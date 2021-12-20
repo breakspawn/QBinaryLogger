@@ -14,8 +14,6 @@
 #include "QDataStream"
 
 class QBinaryLogger {
-
-
 public:
 #pragma pack(1)
     struct header {
@@ -26,12 +24,12 @@ public:
         uint64_t time() const {
 
             uint64_t t = qFromLittleEndian<uint64_t>(m_tm);
-            return  t & ~((uint64_t)(0xffc0) << 48);
+            return  t & ~((uint64_t)(0xFFC0) << 48);
         }
 
         uint64_t ms() const {
             uint64_t ms =  qFromLittleEndian<uint64_t>(m_tm);
-            return (ms >> 54) & 0x02ff;
+            return ms >> 54;
         }
 
         uint16_t len() const {
@@ -40,12 +38,38 @@ public:
     };
 #pragma pack()
 
-
-    enum option {
-        rcv = 1,
-        snd = 2
+    struct Note {
+        header h;
+        QByteArray d;
     };
 
+    static QList<Note> read(const QString & filepath) {
+        QList<Note> notes;
+
+        QFile f(filepath);
+        if(f.exists() && f.open(QIODevice::ReadOnly))
+        {
+            QDataStream ts(&f);
+
+            while(!ts.atEnd())
+            {
+                Note n;
+                int r = ts.readRawData((char*)&n.h, sizeof (header));
+                if(r != sizeof(header)) {
+                    continue;
+                }
+
+                n.d = QByteArray(n.h.len(), 0);
+
+                r = ts.readRawData(n.d.data(), n.d.size());
+
+                if(r == n.h.len())
+                    notes.append(n);
+            }
+        }
+
+        return notes;
+    }
 
     QString sFilePath;
     QDir    dir;
@@ -93,21 +117,15 @@ public:
         QFile f(fileName());
         removeDublicates(QFileInfo(f));
 
-        if(f.open(QFile::ReadWrite))
+        if(f.open(QFile::Append))
         {
-
-
-
             header h;
 
-            uint64_t t =  t = QDateTime::currentDateTime().toTime_t() | ((QTime::currentTime().msecsSinceStartOfDay() % 1000) << 54);
+            uint64_t t =  t = QDateTime::currentDateTime().toTime_t() | ((uint64_t)(QTime::currentTime().msecsSinceStartOfDay() % 1000) << 54);
             h.m_tm =  qToLittleEndian<uint64_t>(t);
-            h.m_mkr = option::snd;
+            h.m_mkr = qToLittleEndian<uint16_t>(0x7FF0);
             h.m_len = qToLittleEndian<uint16_t>(d.size());
-            QDataStream ds(&f);
-            QByteArray result = QByteArray((const char*) &h, sizeof (h)) + d;
-
-            ds << result;
+            f.write(QByteArray((const char*) &h, sizeof (h)) + d);
 
             /* обновляем время последней записи */
             lastWrite = QDateTime::currentDateTime();

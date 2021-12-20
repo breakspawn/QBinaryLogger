@@ -6,7 +6,7 @@ QString hex(uchar bt)
     return QString("%1").arg(bt,2,16,QChar('0')).toUpper();
 }
 
-QString hex(const void* const ptr, size_t len, char spacer)
+QString hex(const void* const ptr, size_t len, char spacer = ' ')
 {
     const char * const data = (char*) ptr;
     QString tmp;
@@ -17,7 +17,7 @@ QString hex(const void* const ptr, size_t len, char spacer)
     return tmp.trimmed();
 }
 
-QString hex(const QByteArray & array, char spacer)
+QString hex(const QByteArray & array, char spacer = ' ')
 {
     return hex(array.constData(), array.length(), spacer);
 }
@@ -30,25 +30,27 @@ QString hex(const QString& str, char spacer)
 int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
-    QFile  testf("test_12.txt");
-    testf.open(QIODevice::ReadOnly | QIODevice::Text);
-    QByteArray bytearray = testf.readAll();
     QBinaryLogger b("test.txt");
+    b.log(QByteArray(5, 0xAA));
 
-    b.log(bytearray);
 
-    QFile  f("test_13.txt");
+    QFile  f(b.fileName());
     f.open(QIODevice::ReadOnly | QIODevice::Text);
-    QString str = hex(f.readAll(), ' ');
-    QStringList list = str.split(' ');
+    qDebug() << hex(f.readAll());
+
+    f.seek(0);
     QBinaryLogger::header h;
-    b.log(f.readAll());
-    f.read((char*)&h, sizeof(h));
+    f.read((char*)&h, sizeof h);
 
+    qDebug() << "Длина записи:" << h.len();
+    qDebug() << "Время записи:" << QString("%1::%2").arg(QDateTime::fromTime_t(h.time()).toString()).arg(h.ms());
 
-     qDebug() << h.m_mkr << endl;
-     qDebug() << h.time() << endl;
-     qDebug() << h.len() << endl;
+    auto notes = QBinaryLogger::read(b.fileName());
+
+    for(auto n : notes)
+    {
+        qDebug() << hex(&n.h, sizeof n.h) << hex(n.d);
+    }
 
     f.close();
 
