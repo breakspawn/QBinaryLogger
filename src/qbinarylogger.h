@@ -9,28 +9,42 @@
 #include <QMap>
 #include <QByteArray>
 #include <QTextStream>
+#include <QtEndian>
+#include "QDebug"
+#include "QDataStream"
 
 class QBinaryLogger {
 
+
 public:
+#pragma pack(1)
     struct header {
         uint16_t m_mkr;
         uint64_t m_tm;
         uint16_t m_len;
 
         uint64_t time() const {
-            return m_tm & ~((uint64_t)(0xffc0) << 48);
+
+            uint64_t t = qFromLittleEndian<uint64_t>(m_tm);
+            return  t & ~((uint64_t)(0xffc0) << 48);
         }
 
         uint64_t ms() const {
-            return m_tm >> 54;
+            uint64_t ms =  qFromLittleEndian<uint64_t>(m_tm);
+            return (ms >> 54) & 0x02ff;
         }
 
         uint16_t len() const {
-            return m_len;
+            return qFromLittleEndian<uint16_t>(m_len);
         }
     };
+#pragma pack()
 
+
+    enum option {
+        rcv = 1,
+        snd = 2
+    };
 
 
     QString sFilePath;
@@ -39,7 +53,6 @@ public:
     QString sExt;
 
     QDateTime lastWrite;
-    QMap<int, QByteArray> preambs;
 
     QBinaryLogger(const QString &filename)
     {
@@ -74,26 +87,31 @@ public:
                 .arg(sExt);
     }
 
-    void addPreabula(int key, const QByteArray &d){
-        preambs.insert(key, d);
-    }
 
-    QByteArray preambula(int key) const{
-        return preambs.value(key);
-    }
 
     void log(const QByteArray & d){
         QFile f(fileName());
         removeDublicates(QFileInfo(f));
 
-        if(f.open(QFile::Append))
+        if(f.open(QFile::ReadWrite))
         {
-            QTextStream ts(&f);
-            ts << d;
-            ts.flush();
+
+
+
+            header h;
+
+            uint64_t t =  t = QDateTime::currentDateTime().toTime_t() | ((QTime::currentTime().msecsSinceStartOfDay() % 1000) << 54);
+            h.m_tm =  qToLittleEndian<uint64_t>(t);
+            h.m_mkr = option::snd;
+            h.m_len = qToLittleEndian<uint16_t>(d.size());
+            QDataStream ds(&f);
+            QByteArray result = QByteArray((const char*) &h, sizeof (h)) + d;
+
+            ds << result;
+
             /* обновляем время последней записи */
             lastWrite = QDateTime::currentDateTime();
-            f.write(d);
+
             f.close();
         }
 
@@ -111,8 +129,6 @@ public:
                 QFile(fi.absoluteFilePath()).remove();
         }
     }
-
-
 };
 
 
