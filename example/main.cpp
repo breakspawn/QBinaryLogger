@@ -31,28 +31,17 @@ int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
     QBinaryLogger b("test.txt");
+    QFile fn(b.fileName());
     b.log(QByteArray(5, 0xAA));
-
-
-    QFile  f(b.fileName());
-    f.open(QIODevice::ReadOnly | QIODevice::Text);
-    qDebug() << hex(f.readAll());
-
-    f.seek(0);
-    QBinaryLogger::header h;
-    f.read((char*)&h, sizeof h);
-
-    qDebug() << "Длина записи:" << h.len();
-    qDebug() << "Время записи:" << QString("%1::%2").arg(QDateTime::fromTime_t(h.time()).toString()).arg(h.ms());
 
     auto notes = QBinaryLogger::read(b.fileName());
 
     for(auto n : notes)
     {
-        qDebug() << hex(&n.h, sizeof n.h) << hex(n.d);
+        qDebug() << "Длина записи:" << n.h.len();
+        qDebug() << "Время записи:" << QString("%1::%2").arg(QDateTime::fromTime_t(n.h.time()).toString()).arg(n.h.ms());
+        qDebug() << hex(&n.h, sizeof n.h) << hex(n.d) << "\n";
     }
-
-    f.close();
 
     return a.exec();
 }

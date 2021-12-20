@@ -17,9 +17,22 @@ class QBinaryLogger {
 public:
 #pragma pack(1)
     struct header {
-        uint16_t m_mkr;
         uint64_t m_tm;
         uint16_t m_len;
+
+        header()
+            : m_tm(0), m_len(0)
+        {
+
+        }
+
+        header(uint16_t datasize)
+        {
+            uint64_t t = QDateTime::currentDateTime().toTime_t() | ((uint64_t)(QTime::currentTime().msecsSinceStartOfDay() % 1000) << 54);
+            m_tm = qToLittleEndian<uint64_t>(t);
+
+            m_len = qToLittleEndian<uint16_t>(datasize);
+        }
 
         uint64_t time() const {
 
@@ -39,6 +52,37 @@ public:
 #pragma pack()
 
     struct Note {
+        Note()
+        {
+
+        }
+
+        Note(const QByteArray & data)
+            : h(data.size()), d(data)
+        {
+
+        }
+
+        QByteArray toByteArray() const
+        {
+            return QByteArray((const char*)&h, sizeof h) + d;
+        }
+
+        Note& operator<<(QDataStream & ds)
+        {
+            header hdr;
+            if(ds.readRawData((char*)&hdr, sizeof hdr) == sizeof hdr) {
+                d = QByteArray(hdr.len(), 0);
+
+                if(ds.readRawData(d.data(), d.size()) == d.size())
+                {
+                    h = hdr;
+                }
+            }
+
+            return *this;
+        }
+
         header h;
         QByteArray d;
     };
@@ -54,16 +98,8 @@ public:
             while(!ts.atEnd())
             {
                 Note n;
-                int r = ts.readRawData((char*)&n.h, sizeof (header));
-                if(r != sizeof(header)) {
-                    continue;
-                }
-
-                n.d = QByteArray(n.h.len(), 0);
-
-                r = ts.readRawData(n.d.data(), n.d.size());
-
-                if(r == n.h.len())
+                n << ts;
+                if(n.h.time() && n.h.len() == n.d.length())
                     notes.append(n);
             }
         }
@@ -94,7 +130,7 @@ public:
         sFileNameWithoutExt = fi.baseName();
         sExt = fi.completeSuffix();
         dir  = fi.dir();
-        QFile(fileName()).remove();
+        removeDublicates(fileName());
     }
 
     QString fileName() const
@@ -111,28 +147,20 @@ public:
                 .arg(sExt);
     }
 
-
-
     void log(const QByteArray & d){
         QFile f(fileName());
         removeDublicates(QFileInfo(f));
 
         if(f.open(QFile::Append))
         {
-            header h;
-
-            uint64_t t =  t = QDateTime::currentDateTime().toTime_t() | ((uint64_t)(QTime::currentTime().msecsSinceStartOfDay() % 1000) << 54);
-            h.m_tm =  qToLittleEndian<uint64_t>(t);
-            h.m_mkr = qToLittleEndian<uint16_t>(0x7FF0);
-            h.m_len = qToLittleEndian<uint16_t>(d.size());
-            f.write(QByteArray((const char*) &h, sizeof (h)) + d);
+            Note note(d);
+            f.write(note.toByteArray());
 
             /* обновляем время последней записи */
             lastWrite = QDateTime::currentDateTime();
 
             f.close();
         }
-
     }
 
     void removeDublicates(const QFileInfo& fi)
