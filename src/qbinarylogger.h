@@ -12,6 +12,9 @@
 #include <QtEndian>
 #include "QDebug"
 #include "QDataStream"
+#include <quazip.h>
+#include <JlCompress.h>
+
 
 class QBinaryLogger {
 public:
@@ -50,6 +53,11 @@ public:
         }
     };
 #pragma pack()
+
+    enum Log_mode_t {
+        zip,
+        truncate
+    };
 
     struct Note {
         Note()
@@ -163,6 +171,7 @@ public:
         }
     }
 
+
     void removeDublicates(const QFileInfo& fi)
     {
         if(fi.exists())
@@ -175,7 +184,36 @@ public:
                 QFile(fi.absoluteFilePath()).remove();
         }
     }
+
+    void toArhive(const QString &path){
+        QFileInfo fi(path);
+        QFileInfo nn(sFilePath);
+        QString name = nn.baseName();
+        QFileInfo oldFi(fileName(QDateTime::currentDateTime().fromTime_t(time(nullptr) - 3600)));
+
+        QString pathToDir = fi.dir().path();
+
+        QDate dt;
+
+        QString nameArchive = QString("%1_%2_%3").arg(QString::number(dt.currentDate().day()))
+                .arg(QString::number(dt.currentDate().month())).arg(QString::number(dt.currentDate().year()));
+
+        QString zipName = QString("%1").arg(QString("%1_%2.zip").arg(name).arg(nameArchive));
+
+        if(oldFi.isFile()){
+            if (JlCompress::compressFile(zipName, oldFi.absoluteFilePath(), QuaZip::mdAdd))
+            {
+                QFile f(oldFi.absolutePath());
+                f.remove(oldFi.absoluteFilePath());
+                qDebug() << "zip opened";
+                qDebug() << "added : " << fi.absoluteFilePath();
+            }
+        }
+    }
+
+
 };
+
 
 
 

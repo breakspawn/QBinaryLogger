@@ -11,8 +11,12 @@ SOURCES += \
         main.cpp
 
 include($$PWD/../qbinarylogger.pri)
+include($$PWD/../quazip/quazip.pri)
+
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
 else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
+
+DISTFILES +=
