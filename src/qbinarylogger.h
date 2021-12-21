@@ -54,9 +54,9 @@ public:
     };
 #pragma pack()
 
-    enum Log_mode_t {
-        zip,
-        truncate
+    enum log_mode_t {
+        ZIP,
+        TRUNCATE
     };
 
     struct Note {
@@ -121,9 +121,12 @@ public:
     QString sExt;
 
     QDateTime lastWrite;
+    log_mode_t mode;
 
-    QBinaryLogger(const QString &filename)
+    QBinaryLogger(const QString &filename, log_mode_t mode = TRUNCATE)
     {
+        this->mode = mode;
+
         sFilePath = filename;
 
         QFileInfo fi(filename);
@@ -138,7 +141,10 @@ public:
         sFileNameWithoutExt = fi.baseName();
         sExt = fi.completeSuffix();
         dir  = fi.dir();
+        if(mode == TRUNCATE)
         removeDublicates(fileName());
+        if(mode == ZIP)
+            toArhive(fileName());
     }
 
     QString fileName() const
@@ -157,7 +163,13 @@ public:
 
     void log(const QByteArray & d){
         QFile f(fileName());
+        if(mode == TRUNCATE)
+        {
         removeDublicates(QFileInfo(f));
+        } else if (mode == ZIP)
+        {
+            toArhive(QFileInfo(f));
+        }
 
         if(f.open(QFile::Append))
         {
@@ -185,32 +197,43 @@ public:
         }
     }
 
-    void toArhive(const QString &path){
-        QFileInfo fi(path);
+    void toArhive(const QFileInfo &fi){
         QFileInfo nn(sFilePath);
         QString name = nn.baseName();
-        QFileInfo oldFi(fileName(QDateTime::currentDateTime().fromTime_t(time(nullptr) - 3600)));
+        QFileInfo oldFi;
 
-        QString pathToDir = fi.dir().path();
+        for(int hourOfDay = 24; hourOfDay > 0; hourOfDay--){
+            int hour = 3600 * hourOfDay;
+            QFileInfo tmp(fileName(QDateTime::currentDateTime().fromTime_t(time(nullptr) - hour)));
+            if(tmp.isFile()){
+                if(fi.lastModified().time().hour() == tmp.lastModified().time().hour()){
+                    if(QDateTime::currentDateTime().date() !=  tmp.lastModified().date()){
+                        oldFi = tmp;
+                        break;
+                    }
+                    continue;
+                }else {
+                    oldFi = tmp;
+                    break;
+                }
 
-        QDate dt;
+            }
+        }
 
-        QString nameArchive = QString("%1_%2_%3").arg(QString::number(dt.currentDate().day()))
-                .arg(QString::number(dt.currentDate().month())).arg(QString::number(dt.currentDate().year()));
-
+        QString nameArchive = QString("%1_%2_%3").arg(QString::number(oldFi.lastModified().date().day()))
+                .arg(QString::number(oldFi.lastModified().date().month())).arg(QString::number(oldFi.lastModified().date().year()));
         QString zipName = QString("%1").arg(QString("%1_%2.zip").arg(name).arg(nameArchive));
 
-        if(oldFi.isFile()){
+        if(oldFi.isFile()){            
             if (JlCompress::compressFile(zipName, oldFi.absoluteFilePath(), QuaZip::mdAdd))
             {
                 QFile f(oldFi.absolutePath());
                 f.remove(oldFi.absoluteFilePath());
                 qDebug() << "zip opened";
-                qDebug() << "added : " << fi.absoluteFilePath();
+                qDebug() << "added : " << oldFi.absoluteFilePath();
             }
         }
     }
-
 
 };
 

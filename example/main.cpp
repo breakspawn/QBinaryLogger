@@ -33,7 +33,7 @@ QString hex(const QString& str, char spacer)
 int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
-    QBinaryLogger b("log.log");
+    QBinaryLogger b("log.log", QBinaryLogger::ZIP);
     QFile fn(b.fileName());
     b.log(QByteArray(5, 0xAA));
 
@@ -46,14 +46,7 @@ int main(int argc, char *argv[])
         qDebug() << "Время записи:" << QString("%1::%2").arg(QDateTime::fromTime_t(n.h.time()).toString()).arg(n.h.ms());
         qDebug() << hex(&n.h, sizeof n.h) << hex(n.d) << "\n";
     }
-    b.toArhive(b.fileName());
-    QDir dir("/path/to/dir");
-    dir.setFilter(QDir::Dirs);
-    QFileInfoList list = dir.entryInfoList();
-    for (int i = 0; i < list.size(); ++i) {
-        QFileInfo fileInfo = list.at(i);
-        qDebug() << fileInfo.fileName();
-    }
+
 
     return a.exec();
 }
